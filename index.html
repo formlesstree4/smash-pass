@@ -14,17 +14,20 @@
     padding: 20px;
   }
   h1 { margin-bottom: 0.5em; }
-  #game, #summary { display: none; }
+  #builder, #game, #summary { display: none; }
   img {
     max-width: 300px;
     max-height: 300px;
     border-radius: 12px;
     margin: 20px 0;
     transition: transform 0.6s ease, opacity 0.6s ease;
+    display: inline-block;
   }
-  .slide-out-left { transform: translateX(-100%); opacity: 0; }
-  .slide-out-right { transform: translateX(100%); opacity: 0; }
-  .slide-in { transform: translateX(0); opacity: 1; }
+  .slide-out-left { transform: translateX(-120%); opacity: 0; }
+  .slide-out-right { transform: translateX(120%); opacity: 0; }
+  .slide-in-left { transform: translateX(-120%); opacity: 0; }
+  .slide-in-right { transform: translateX(120%); opacity: 0; }
+  .visible { transform: translateX(0); opacity: 1; }
   button {
     padding: 10px 20px;
     margin: 10px;
@@ -38,25 +41,56 @@
   .smash { background: #4caf50; color: white; }
   .pass { background: #f44336; color: white; }
   .neutral { background: #555; color: white; }
+  input[type="text"] {
+    padding: 5px;
+    border-radius: 6px;
+    border: none;
+    width: 220px;
+    margin: 5px;
+  }
+  table {
+    margin: 20px auto;
+    border-collapse: collapse;
+    width: 80%;
+  }
+  th, td {
+    border-bottom: 1px solid #333;
+    padding: 6px;
+  }
   textarea {
     width: 90%;
-    height: 150px;
+    height: 120px;
     margin: 10px 0;
   }
 </style>
 </head>
 <body>
-<h1>Smash or Pass</h1>
+<h1>🔥 Smash or Pass 🔥</h1>
 
-<div id="setup">
-  <p>Paste your JSON list below or import a file.</p>
+<!-- BUILDER SECTION -->
+<div id="builder">
+  <h2>List Builder</h2>
+  <div>
+    <input type="text" id="itemName" placeholder="Name">
+    <input type="text" id="itemImage" placeholder="Image URL">
+    <button class="neutral" id="addItemBtn">Add</button>
+  </div>
+
+  <table id="listTable">
+    <thead><tr><th>Name</th><th>Image</th><th>Action</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <button class="neutral" id="exportBtn">Export JSON</button>
+  <button class="neutral" id="importBtn">Import JSON</button>
+  <input type="file" id="fileInput" accept=".json" style="display:none;">
   <textarea id="jsonInput" placeholder='[{"name":"Example","imageUrl":"https://..."}]'></textarea><br>
-  <input type="file" id="fileInput" accept=".json">
-  <br>
-  <button class="neutral" id="startBtn">Start Game</button>
-  <button class="neutral" id="exportBtn">Export Current List</button>
+  <button class="neutral" id="loadJsonBtn">Load JSON</button>
+  <br><br>
+  <button class="smash" id="startBtn">Start Game</button>
 </div>
 
+<!-- GAME SECTION -->
 <div id="game">
   <h2 id="name"></h2>
   <div id="imageContainer">
@@ -69,6 +103,7 @@
   <p id="progress"></p>
 </div>
 
+<!-- SUMMARY SECTION -->
 <div id="summary">
   <h2>Summary</h2>
   <div id="results"></div>
@@ -80,58 +115,96 @@ let list = [];
 let index = 0;
 let results = [];
 
+const builder = document.getElementById('builder');
+const game = document.getElementById('game');
+const summary = document.getElementById('summary');
+const listTableBody = document.querySelector('#listTable tbody');
+
 const startBtn = document.getElementById('startBtn');
-const fileInput = document.getElementById('fileInput');
+const addItemBtn = document.getElementById('addItemBtn');
 const exportBtn = document.getElementById('exportBtn');
+const importBtn = document.getElementById('importBtn');
+const fileInput = document.getElementById('fileInput');
+const loadJsonBtn = document.getElementById('loadJsonBtn');
+
 const image = document.getElementById('image');
 const nameEl = document.getElementById('name');
 const progress = document.getElementById('progress');
-const game = document.getElementById('game');
-const setup = document.getElementById('setup');
-const summary = document.getElementById('summary');
 const resultsDiv = document.getElementById('results');
 
+builder.style.display = "block";
+
+addItemBtn.onclick = () => {
+  const name = document.getElementById('itemName').value.trim();
+  const imageUrl = document.getElementById('itemImage').value.trim();
+  if (!name || !imageUrl) return alert("Please fill out both fields.");
+  list.push({ name, imageUrl });
+  document.getElementById('itemName').value = "";
+  document.getElementById('itemImage').value = "";
+  renderList();
+};
+
+function renderList() {
+  listTableBody.innerHTML = list.map((x, i) => `
+    <tr>
+      <td>${x.name}</td>
+      <td><a href="${x.imageUrl}" target="_blank">View</a></td>
+      <td><button class="pass" onclick="removeItem(${i})">Remove</button></td>
+    </tr>
+  `).join("");
+}
+
+function removeItem(i) {
+  list.splice(i, 1);
+  renderList();
+}
+
+exportBtn.onclick = () => {
+  const blob = new Blob([JSON.stringify(list, null, 2)], {type: "application/json"});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = "smash_or_pass_list.json";
+  a.click();
+};
+
+importBtn.onclick = () => fileInput.click();
+fileInput.onchange = e => {
+  const file = e.target.files[0];
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      list = JSON.parse(e.target.result);
+      renderList();
+    } catch {
+      alert("Invalid JSON file.");
+    }
+  };
+  reader.readAsText(file);
+};
+
+loadJsonBtn.onclick = () => {
+  try {
+    list = JSON.parse(document.getElementById('jsonInput').value);
+    renderList();
+  } catch {
+    alert("Invalid JSON format.");
+  }
+};
+
 startBtn.onclick = startGame;
-fileInput.onchange = handleFile;
-exportBtn.onclick = exportList;
 document.getElementById('smashBtn').onclick = () => rate("Smash");
 document.getElementById('passBtn').onclick = () => rate("Pass");
 document.getElementById('restartBtn').onclick = () => location.reload();
 
 document.addEventListener('keydown', e => {
-  if (!game.style.display || game.style.display === "none") return;
+  if (game.style.display !== "block") return;
   if (e.key.toLowerCase() === 's') rate("Smash");
   if (e.key.toLowerCase() === 'p') rate("Pass");
 });
 
-function handleFile() {
-  const file = fileInput.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    document.getElementById('jsonInput').value = e.target.result;
-  };
-  reader.readAsText(file);
-}
-
-function exportList() {
-  const data = document.getElementById('jsonInput').value;
-  const blob = new Blob([data], {type: "application/json"});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = "smash_or_pass_list.json";
-  a.click();
-}
-
 function startGame() {
-  try {
-    list = JSON.parse(document.getElementById('jsonInput').value);
-    if (!Array.isArray(list) || list.length === 0) throw "Invalid JSON";
-  } catch {
-    alert("Please provide a valid JSON array first.");
-    return;
-  }
-  setup.style.display = "none";
+  if (list.length === 0) return alert("Please add some items first!");
+  builder.style.display = "none";
   game.style.display = "block";
   index = 0;
   results = [];
@@ -140,20 +213,37 @@ function startGame() {
 
 function showItem(direction = "right") {
   const item = list[index];
-  nameEl.textContent = item.name;
-  image.classList.remove("slide-in", "slide-out-left", "slide-out-right");
-  void image.offsetWidth; // force reflow
+  image.className = ""; // reset all classes
+  image.style.opacity = 0;
 
-  image.classList.add(direction === "right" ? "slide-in" : "slide-in");
-  image.src = item.imageUrl;
-  progress.textContent = `${index + 1} / ${list.length}`;
+  // Start hidden off-screen depending on direction
+  image.classList.add(direction === "left" ? "slide-in-left" : "slide-in-right");
+
+  setTimeout(() => {
+    image.src = item.imageUrl;
+    nameEl.textContent = item.name;
+    image.classList.add("visible");
+    image.style.opacity = 1;
+    progress.textContent = `${index + 1} / ${list.length}`;
+  }, 50);
 }
 
 function rate(choice) {
-  const direction = choice === "Smash" ? "right" : "left";
+  const direction = choice === "Smash" ? "left" : "right";
+  image.classList.remove("visible");
+  
+  // clear any excessive ones
+  image.classList.remove("slide-out-right");
+  image.classList.remove("slide-out-left");
+  image.classList.remove("slide-in-right");
+  image.classList.remove("slide-in-left");
+  
   image.classList.add(direction === "right" ? "slide-out-right" : "slide-out-left");
 
-  setTimeout(() => {
+  image.addEventListener("transitionend", handleTransition);
+
+  function handleTransition() {
+    image.removeEventListener("transitionend", handleTransition);
     results.push({...list[index], result: choice});
     index++;
     if (index < list.length) {
@@ -161,7 +251,7 @@ function rate(choice) {
     } else {
       endGame();
     }
-  }, 500);
+  }
 }
 
 function endGame() {
